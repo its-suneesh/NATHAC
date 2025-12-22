@@ -1,90 +1,195 @@
-# NATHAC: Networked Academic Thinking & Holistic Analysis Core
 
-NATHAC is a FastAPI-powered analysis engine that uses AI to predict a student's risk level in a target subject by analyzing their performance in prerequisite subjects.
+
+# 🧠 NATHAC – Academic Risk Analysis System
+
+NATHAC is an **AI-powered academic risk analysis system** built using **FastAPI** and **Google Gemini AI**.
+It analyzes a student’s **prerequisite subject performance** to predict the **risk level** for future subjects and provides **actionable academic recommendations**.
 
 ---
 
-## 🛠 Setup & Environment
+## ✨ Key Features
 
-The project uses `pydantic-settings` to manage configuration via a `.env` file.
+* 🚀 **FastAPI-based REST API**
+* 🤖 **Gemini AI integration** (`gemini-2.5-flash`)
+* 🔐 **JWT Authentication** (login → access token)
+* 🧵 **Async, non-blocking AI calls** (no hanging requests)
+* 🧪 **Structured request & response schemas**
+* 📊 **Prerequisite-based academic risk analysis**
+* 📝 **Centralized logging with rotating log files**
+* 🧱 **Clean, scalable project structure**
 
-1. **Create a `.env` file** in the root directory:
-```bash
-touch .env
+---
+
+## 🗂️ Project Structure
 
 ```
-
-
-2. **Add your Gemini API Key**:
-Open the `.env` file and add the following variables:
-```env
-NATHAC_ENV="dev"
-GEMINI_API_KEY="your_actual_gemini_api_key_here"
-
+nathac/
+│
+├── app/
+│   ├── api/
+│   │   ├── analyze.py        # Protected analysis endpoint
+│   │   └── auth.py           # Login & token generation
+│   │
+│   ├── core/
+│   │   ├── config.py         # Environment configuration
+│   │   ├── security.py       # JWT create & verify
+│   │   ├── dependencies.py  # Auth dependency
+│   │   └── logging_config.py# Logging setup
+│   │
+│   ├── models/
+│   │   └── schemas.py        # Pydantic models
+│   │
+│   ├── services/
+│   │   ├── processor.py     # Core analysis workflow
+│   │   └── llm_service.py   # Async Gemini AI calls
+│   │
+│   └── main.py               # FastAPI app entry point
+│
+├── logs/
+│   ├── app.log               # Application logs
+│   └── error.log             # Error logs
+│
+├── .env                      # Environment variables (not committed)
+├── .gitignore
+├── requirements.txt
+└── README.md
 ```
 
-* **GEMINI_API_KEY**: Your secret key from Google AI Studio.
-
 ---
 
-## 🚀 How to Run
+## 🔐 Authentication Flow (JWT)
 
-Ensure you have the required dependencies installed (FastAPI, Pydantic, Uvicorn, and Google Generative AI).
+1. **Login** using username & password
+2. Receive **JWT access token**
+3. Use token to access protected endpoints
 
-1. **Start the server**:
-```bash
-uvicorn main:app --reload
+### Login Endpoint
 
 ```
+POST /auth/login
+```
 
+**Request**
 
-2. **Access the API**:
-The server will run at `http://127.0.0.1:8000`.
+```json
+{
+  "username": "admin",
+  "password": "admin123"
+}
+```
+
+**Response**
+
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIs...",
+  "token_type": "bearer"
+}
+```
 
 ---
 
-## 🔍 How to Check (Endpoints)
+## 🧠 Academic Risk Analysis Endpoint
 
-FastAPI automatically generates interactive documentation for testing.
+### Protected Endpoint
 
-### 1. Interactive Documentation (Swagger UI)
+```
+POST /api/v1/analyze
+```
 
-Go to: **`http://127.0.0.1:8000/docs`**
-This provides a visual interface to send test requests and view the exact JSON schema required.
+### Headers
 
-### 2. Main Endpoint
+```
+Authorization: Bearer <access_token>
+```
 
-* **POST** `/api/v1/analyze`
-* **Description**: Analyzes a student's history against prerequisite "dependencies" to generate a risk report.
-
----
-
-## 📝 Example Request Body
-
-To check the endpoint manually (e.g., via Postman or the `/docs` page), use this JSON format:
+### Request Body (Example)
 
 ```json
 {
   "student": {
-    "student_id": "STU123",
+    "student_id": "S001",
     "academic_history": [
       {
-        "subject_code": "MATH101",
-        "internal": [{"name": "Quiz", "score": 85, "max": 100}],
-        "external": {"score": 78, "max": 100}
+        "subject_code": "CS101",
+        "semester": 1,
+        "internal": [
+          { "name": "Midterm", "score": 18, "max": 25 }
+        ],
+        "external": { "score": 42, "max": 60 },
+        "final_grade": "B"
       }
     ]
   },
   "dependencies": {
     "subjects_to_predict": [
       {
-        "subject_code": "PHYS201",
+        "subject_code": "CS301",
         "dependencies": [
-          {"subject_code": "MATH101", "weight": 1.0, "reason": "Calculus base"}
+          {
+            "subject_code": "CS101",
+            "weight": 0.4,
+            "reason": "Programming fundamentals"
+          }
         ]
       }
     ]
   }
 }
+```
 
+### Response (Example)
+
+```json
+{
+  "analysis_id": "e7f1d5c4-8c1f-4e2b-a9b1-9d9b7f13aabc",
+  "student_id": "S001",
+  "subjects_requested": ["CS301"],
+  "subject_outcomes": [
+    {
+      "subject_code": "CS301",
+      "risk_level": "Medium",
+      "key_signals": [
+        {
+          "signal": "Weak loop concepts",
+          "description": "Moderate performance in CS101"
+        }
+      ],
+      "risk_drivers": ["Low internal score in CS101"],
+      "recommended_focus": ["Practice basic programming problems"]
+    }
+  ]
+}
+```
+
+---
+
+## ⚙️ Environment Configuration
+
+Create a `.env` file in the root directory:
+
+```env
+GEMINI_API_KEY=your_gemini_api_key_here
+JWT_SECRET_KEY=your_strong_random_secret_here
+```
+
+> ⚠️ Never commit `.env` to GitHub.
+
+## 📦 Requirements
+
+Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+## ▶️ Running the Application
+
+```bash
+uvicorn app.main:app --reload
+```
+
+Open Swagger UI:
+
+```
+http://127.0.0.1:8000/
 ```
