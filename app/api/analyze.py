@@ -1,17 +1,22 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from app.models.schemas import AnalyzeRequest, AnalysisResponse
 from app.services.processor import process_student_risk
 from app.core.logging_config import app_logger, error_logger
+from app.core.dependencies import get_current_user
 
 router = APIRouter(prefix="/api/v1", tags=["NATHAC"])
 
 
 @router.post("/analyze", response_model=AnalysisResponse)
-async def analyze_student(request: AnalyzeRequest):
+async def analyze_student(
+    request: AnalyzeRequest,
+    current_user: str = Depends(get_current_user)  # 🔐 JWT CHECK
+):
 
     app_logger.info(
-        f"Analysis request received | Student={request.student.student_id}"
+        f"Analysis request received | Student={request.student.student_id} "
+        f"| RequestedBy={current_user}"
     )
 
     try:
@@ -22,13 +27,13 @@ async def analyze_student(request: AnalyzeRequest):
 
         app_logger.info(
             f"Analysis completed | Student={request.student.student_id} "
-            f"| Subjects={len(response.subject_outcomes)}"
+            f"| RequestedBy={current_user}"
         )
 
         return response
 
     except Exception as e:
         error_logger.error(
-            f"Analysis failed | Student={request.student.student_id} | Error={e}"
+            f"Analysis failed | RequestedBy={current_user} | Error={e}"
         )
         raise

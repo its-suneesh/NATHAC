@@ -5,19 +5,9 @@ from fastapi import HTTPException
 from app.core.config import settings
 from app.core.logging_config import app_logger, error_logger
 
-
-# -------------------------------------------------
-# Gemini configuration (STABLE & WORKING)
-# -------------------------------------------------
 genai.configure(api_key=settings.GEMINI_API_KEY)
-
-# This model is confirmed working for your account
 gemini_model = genai.GenerativeModel("gemini-2.5-flash")
 
-
-# -------------------------------------------------
-# Async AI analysis function (NON-BLOCKING)
-# -------------------------------------------------
 async def analyze_with_ai(subject_code: str, filtered_history: list) -> dict:
     """
     Calls Gemini AI asynchronously to analyze academic risk.
