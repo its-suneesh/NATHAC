@@ -21,18 +21,49 @@ async def analyze_with_ai(subject_code: str, filtered_history: list) -> dict:
     prompt = f"""
 You are an academic risk analysis engine.
 
-Target Subject: {subject_code}
-Student History: {filtered_history}
+TASK:
+Analyze the student's readiness for the target subject using ONLY the provided academic history.
+Focus on weaknesses, gaps, and performance trends that may impact success.
 
-Return ONLY valid JSON in the following format:
+TARGET SUBJECT:
+{subject_code}
+
+STUDENT ACADEMIC HISTORY (prerequisite subjects only):
+{filtered_history}
+
+ANALYSIS GUIDELINES:
+- Evaluate internal, external, and overall performance.
+- Identify conceptual weaknesses, not just low scores.
+- Consider consistency across assessments.
+- Do NOT summarize strengths unless relevant to risk.
+
+RISK LEVEL RULES:
+- Low: Strong and consistent performance with no major gaps.
+- Medium: Mixed performance or minor conceptual weaknesses.
+- High: Poor performance or clear foundational gaps.
+
+OUTPUT RULES:
+- Return ONLY valid JSON.
+- Be specific and concise.
+- Avoid generic advice.
+- Base every conclusion on the given data.
+
+REQUIRED OUTPUT FORMAT:
 {{
   "subject_code": "string",
   "risk_level": "Low | Medium | High",
   "key_signals": [
-    {{ "signal": "string", "description": "string" }}
+    {{
+      "signal": "short risk indicator",
+      "description": "clear explanation based on student data"
+    }}
   ],
-  "risk_drivers": ["string"],
-  "recommended_focus": ["string"]
+  "risk_drivers": [
+    "specific factor contributing to risk"
+  ],
+  "recommended_focus": [
+    "actionable study or skill improvement suggestion"
+  ]
 }}
 """
 
