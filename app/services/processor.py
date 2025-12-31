@@ -1,18 +1,26 @@
 from uuid import uuid4
-
 from app.models.schemas import SubjectOutcome, AnalysisResponse
-from app.services.llm_service import analyze_with_ai
+from app.services.llm_service import get_llm_provider
 from app.core.logging_config import app_logger, error_logger
 
 
-# -------------------------------------------------
-# Main processing logic (ASYNC)
-# -------------------------------------------------
-async def process_student_risk(student, dependencies):
+async def process_student_risk(student, dependencies, provider_name: str = None):
+    """
+    Orchestrates the risk analysis process.
+    - Selects the correct AI provider (Gemini/DeepSeek/OpenAI).
+    - Filters student history for each target subject.
+    - Calls the AI asynchronously.
+    """
 
     app_logger.info(
-        f"Processing analysis started | Student={student.student_id}"
+        f"Processing analysis started | Student={student.student_id} | Model={provider_name}"
     )
+
+    try:
+        llm_service = get_llm_provider(provider_name)
+    except Exception as e:
+        error_logger.error(f"Failed to initialize LLM Provider: {e}")
+        raise
 
     subject_outcomes = []
 
@@ -24,14 +32,12 @@ async def process_student_risk(student, dependencies):
         )
 
         try:
-            # Extract prerequisite subject codes
             dependency_codes = {
                 dep.subject_code for dep in subject.dependencies
             }
 
-            # Filter student history for prerequisite subjects
             filtered_history = [
-                record for record in student.academic_history
+                record.dict() for record in student.academic_history
                 if record.subject_code in dependency_codes
             ]
 
@@ -40,13 +46,17 @@ async def process_student_risk(student, dependencies):
                 f"| Subject={subject.subject_code}"
             )
 
-            # ---- ASYNC AI CALL ----
-            raw_result = await analyze_with_ai(
+            if not filtered_history:
+                app_logger.warning(
+                    f"Skipping AI analysis: No matching history found for {subject.subject_code}"
+                )
+                continue
+
+            raw_result = await llm_service.analyze(
                 subject.subject_code,
                 filtered_history
             )
-
-            # Validate AI output
+            
             outcome = SubjectOutcome(**raw_result)
             subject_outcomes.append(outcome)
 
@@ -56,7 +66,7 @@ async def process_student_risk(student, dependencies):
                 f"Student={student.student_id} | "
                 f"Subject={subject.subject_code} | Error={e}"
             )
-            raise
+            continue
 
     app_logger.info(
         f"Processing analysis completed | Student={student.student_id}"

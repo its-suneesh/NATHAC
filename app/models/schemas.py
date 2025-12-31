@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Literal
 from pydantic import BaseModel
 
 
@@ -73,3 +73,5 @@ class AnalysisResponse(BaseModel):
 class AnalyzeRequest(BaseModel):
     student: StudentHistory
     dependencies: DependencyRequest
+    model: Literal["openai", "gemini", "deepseek"] = "gemini"
+    

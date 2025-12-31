@@ -11,18 +11,19 @@ router = APIRouter(prefix="/api/v1", tags=["NATHAC"])
 @router.post("/analyze", response_model=AnalysisResponse)
 async def analyze_student(
     request: AnalyzeRequest,
-    current_user: str = Depends(get_current_user)  # 🔐 JWT CHECK
+    current_user: str = Depends(get_current_user)
 ):
 
     app_logger.info(
         f"Analysis request received | Student={request.student.student_id} "
-        f"| RequestedBy={current_user}"
+        f"| RequestedBy={current_user} | Model={request.model_provider}"
     )
 
     try:
         response = await process_student_risk(
             request.student,
-            request.dependencies
+            request.dependencies,
+            provider_name=request.model_provider
         )
 
         app_logger.info(
