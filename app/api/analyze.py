@@ -16,14 +16,14 @@ async def analyze_student(
 
     app_logger.info(
         f"Analysis request received | Student={request.student.student_id} "
-        f"| RequestedBy={current_user} | Model={request.model_provider}"
+        f"| RequestedBy={current_user} | Model={request.model}"
     )
 
     try:
         response = await process_student_risk(
             request.student,
             request.dependencies,
-            provider_name=request.model_provider
+            provider_name=request.model
         )
 
         app_logger.info(
