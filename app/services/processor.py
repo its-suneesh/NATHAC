@@ -1,82 +1,81 @@
-from uuid import uuid4
+import asyncio
 from app.models.schemas import SubjectOutcome, AnalysisResponse
 from app.services.llm_service import get_llm_provider
 from app.core.logging_config import app_logger, error_logger
 
-
-async def process_student_risk(student, dependencies, provider_name: str = None):
+async def process_student_risk(request_data, provider_name: str = None):
     """
-    Orchestrates the risk analysis process.
-    - Selects the correct AI provider (Gemini/DeepSeek/OpenAI).
-    - Filters student history for each target subject.
-    - Calls the AI asynchronously.
+    Orchestrates the parallel risk analysis.
+    1. Extracts student history (CoursesStudied).
+    2. Creates async tasks for each target subject (CoursesToStudy).
+    3. Aggregates results.
     """
-
+    
+    student = request_data.student_data
+    
     app_logger.info(
-        f"Processing analysis started | Student={student.student_id} | Model={provider_name}"
+        f"Starting parallel analysis | Student={student.StudentID} | "
+        f"SubjectCount={len(student.CoursesToStudyData)} | Provider={provider_name}"
     )
 
     try:
         llm_service = get_llm_provider(provider_name)
     except Exception as e:
-        error_logger.error(f"Failed to initialize LLM Provider: {e}")
+        error_logger.critical(f"Failed to initialize LLM service: {e}")
+        raise
+
+    history_dicts = [h.dict() for h in student.CoursesStudiedData]
+
+    tasks = []
+    for course_to_study in student.CoursesToStudyData:
+        task = llm_service.analyze(
+            target_paper=course_to_study.dict(),
+            history=history_dicts
+        )
+        tasks.append(task)
+
+    try:
+        raw_results = await asyncio.gather(*tasks, return_exceptions=True)
+    except Exception as e:
+        error_logger.critical(f"Critical failure during async gather: {e}")
         raise
 
     subject_outcomes = []
+    
+    for i, result in enumerate(raw_results):
+        original_course = student.CoursesToStudyData[i]
 
-    for subject in dependencies.subjects_to_predict:
-
-        app_logger.info(
-            f"Analyzing subject={subject.subject_code} "
-            f"| DependencyCount={len(subject.dependencies)}"
-        )
-
-        try:
-            dependency_codes = {
-                dep.subject_code for dep in subject.dependencies
-            }
-
-            filtered_history = [
-                record.dict() for record in student.academic_history
-                if record.subject_code in dependency_codes
-            ]
-
-            app_logger.info(
-                f"Filtered history size={len(filtered_history)} "
-                f"| Subject={subject.subject_code}"
-            )
-
-            if not filtered_history:
-                app_logger.warning(
-                    f"Skipping AI analysis: No matching history found for {subject.subject_code}"
-                )
-                continue
-
-            raw_result = await llm_service.analyze(
-                subject.subject_code,
-                filtered_history
-            )
-            
-            outcome = SubjectOutcome(**raw_result)
-            subject_outcomes.append(outcome)
-
-        except Exception as e:
+        if isinstance(result, Exception):
             error_logger.error(
-                f"Subject analysis failed | "
-                f"Student={student.student_id} | "
-                f"Subject={subject.subject_code} | Error={e}"
+                f"Task failed for subject {original_course.PaperCode}: {result}"
             )
-            continue
+            subject_outcomes.append(SubjectOutcome(
+                paper_name=original_course.PaperName,
+                paper_code=original_course.PaperCode,
+                risk_level="Unknown",
+                key_signals=[],
+                risk_drivers=["Internal Analysis Error"],
+                recommended_focus=["Contact administrator"]
+            ))
+        else:
+            try:
+                outcome = SubjectOutcome(**result)
+                subject_outcomes.append(outcome)
+            except Exception as validation_err:
+                error_logger.error(f"Schema validation failed for AI response: {validation_err}")
+                subject_outcomes.append(SubjectOutcome(
+                    paper_name=original_course.PaperName,
+                    paper_code=original_course.PaperCode,
+                    risk_level="Unknown",
+                    key_signals=[],
+                    risk_drivers=["Data Format Error"],
+                    recommended_focus=[]
+                ))
 
-    app_logger.info(
-        f"Processing analysis completed | Student={student.student_id}"
-    )
+    app_logger.info(f"Analysis completed successfully | Student={student.StudentID}")
 
     return AnalysisResponse(
-        analysis_id=str(uuid4()),
-        student_id=student.student_id,
-        subjects_requested=[
-            s.subject_code for s in dependencies.subjects_to_predict
-        ],
+        student_id=student.StudentID,
+        studentsemesteryerrid=student.StudentSemesterYearID,
         subject_outcomes=subject_outcomes
     )

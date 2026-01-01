@@ -1,77 +1,61 @@
-from typing import List, Optional, Literal
-from pydantic import BaseModel
+from typing import List, Optional, Literal, Any
+from pydantic import BaseModel, Field
 
 
-# -------------------------
-# Student Performance Input
-# -------------------------
 
-class InternalScore(BaseModel):
-    name: str
-    score: float
-    max: float
+class DependencyData(BaseModel):
+    DependencyCourseName: str
+    DependencyCourseCode: str
+    Weightage: str
+    Reason: str
 
+class CourseToStudy(BaseModel):
+    PaperName: str
+    PaperCode: str
+    PaperNameID: int
+    SemesterYearStudentID: int
+    DependencyCourseData: List[DependencyData] = []
+    model_config = {"extra": "ignore"}
 
-class ExternalScore(BaseModel):
-    score: float
-    max: float
+class CourseStudied(BaseModel):
+    PaperName: str
+    PaperCode: str
+    InternalMark: float
+    InternalMarkMax: Optional[float] = 0.0
+    ExternalMark: float
+    ExternalMarkMax: Optional[float] = 0.0
+    SemesterName: Optional[str] = None
+    MarkOrGrade: Optional[Any] = None 
+    model_config = {"extra": "ignore"}
 
+class StudentRequestData(BaseModel):
+    StudentName: str
+    StudentID: str
+    StudentSemesterYearID: str
+    AdmissionNo: str
+    RegisterNo: str
+    CourseName: str
+    CoursesToStudyData: List[CourseToStudy]
+    CoursesStudiedData: List[CourseStudied]
 
-class SubjectHistory(BaseModel):
-    subject_code: str
-    semester: Optional[int] = None
-    internal: List[InternalScore]
-    external: ExternalScore
-    final_grade: Optional[str] = None
-
-
-class StudentHistory(BaseModel):
-    student_id: str
-    academic_history: List[SubjectHistory]
-
-
-# -------------------------
-# Dependency Input (TCS)
-# -------------------------
-
-class Dependency(BaseModel):
-    subject_code: str
-    weight: float
-    reason: Optional[str] = None
-
-
-class SubjectDependency(BaseModel):
-    subject_code: str
-    dependencies: List[Dependency]
+class AnalyzeRequest(BaseModel):
+    student_data: StudentRequestData
+    model_provider: Literal["gemini", "openai", "deepseek"] = "gemini"
 
 
-class DependencyRequest(BaseModel):
-    subjects_to_predict: List[SubjectDependency]
-
-
-# -------------------------
-# Output Models
-# -------------------------
 class KeySignal(BaseModel):
     signal: str
     description: str
 
 class SubjectOutcome(BaseModel):
-    subject_code: str
+    paper_name: str
+    paper_code: str
     risk_level: str
-    key_signals: List[KeySignal]   
+    key_signals: List[KeySignal]
     risk_drivers: List[str]
     recommended_focus: List[str]
 
-
 class AnalysisResponse(BaseModel):
-    analysis_id: str
     student_id: str
-    subjects_requested: List[str]
+    studentsemesteryerrid: str
     subject_outcomes: List[SubjectOutcome]
-    
-class AnalyzeRequest(BaseModel):
-    student: StudentHistory
-    dependencies: DependencyRequest
-    model: Literal["openai", "gemini", "deepseek"] = "gemini"
-    
