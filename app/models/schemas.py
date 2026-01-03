@@ -1,17 +1,18 @@
 from typing import List, Optional, Literal, Any
-from pydantic import BaseModel, Field
-
+from pydantic import BaseModel, HttpUrl
 
 
 class DependencyData(BaseModel):
-    DependencyCourseName: str
-    DependencyCourseCode: str
-    Weightage: str
-    Reason: str
+    DependencyCourseName: str = "Unknown"
+    DependencyCourseCode: str = "Unknown"
+    Weightage: Optional[str] = "N/A"
+    Reason: Optional[str] = "N/A"
+    model_config = {"extra": "ignore"}
 
 class CourseToStudy(BaseModel):
     PaperName: str
     PaperCode: str
+    CourseOutComes: Optional[str] = None
     PaperNameID: int
     SemesterYearStudentID: int
     DependencyCourseData: List[DependencyData] = []
@@ -20,28 +21,37 @@ class CourseToStudy(BaseModel):
 class CourseStudied(BaseModel):
     PaperName: str
     PaperCode: str
-    InternalMark: float
+    SemesterYearStudentID: str
+    CourseOutComes: Optional[str] = None
+    PaperNameID: int
+    InternalMark: float = 0.0
     InternalMaxMark: Optional[float] = 0.0
-    ExternalMark: float
+    InternalGradeObtained: Optional[str] = None
+    ExternalMark: float = 0.0
     ExternalMaxMark: Optional[float] = 0.0
+    GradeObtained: Optional[str] = None
     SemesterName: Optional[str] = None
-    MarkOrGrade: Optional[Any] = None 
+    MarkOrGrade: Optional[str] = None 
     model_config = {"extra": "ignore"}
 
 class StudentRequestData(BaseModel):
     StudentName: str
-    StudentID: str
-    SemesterYearStudentID: str
-    AdmissionNo: Optional[str]
-    RegisterNo: Optional[str]
-    CourseName: Optional[str]
+    StudentID: Any
+    Batch: Optional[str] = None
+    Gender: Optional[str] = None
+    Email: Optional[str] = None
+    SemesterYearStudentID: Any
+    AdmissionNo: Optional[str] = None
+    RegisterNo: Optional[str] = None
+    CourseName: Optional[str] = None
     CoursesToStudyData: List[CourseToStudy]
     CoursesStudiedData: List[CourseStudied]
+    model_config = {"extra": "ignore"}
+
 
 class AnalyzeRequest(BaseModel):
-    student_data: StudentRequestData
+    url: HttpUrl
     model_provider: Literal["gemini", "openai", "deepseek"] = "gemini"
-
 
 class KeySignal(BaseModel):
     signal: str
@@ -54,7 +64,6 @@ class SubjectOutcome(BaseModel):
     key_signals: List[KeySignal]
     risk_drivers: List[str]
     recommended_focus: List[str]
-    
 
 class AnalysisResponse(BaseModel):
     student_id: str

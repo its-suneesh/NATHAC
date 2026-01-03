@@ -15,16 +15,19 @@ class LLMProvider(abc.ABC):
 
     def _clean_json_response(self, raw_text: str) -> dict:
         """
-        Production Fix: Strips Markdown code blocks (e.g. ```json ... ```)
+        Production Utility: Strips Markdown code blocks (e.g. ```json ... ```)
         and attempts to locate the valid JSON object.
         """
         try:
+            # 1. Try direct parsing first
             return json.loads(raw_text)
         except json.JSONDecodeError:
+            # 2. Try stripping markdown
             clean_text = re.sub(r"```json\s*|\s*```", "", raw_text).strip()
             try:
                 return json.loads(clean_text)
             except json.JSONDecodeError:
+                # 3. Fallback: Find the first curly brace pair
                 match = re.search(r"(\{.*\})", raw_text, re.DOTALL)
                 if match:
                     try:
@@ -32,11 +35,13 @@ class LLMProvider(abc.ABC):
                     except:
                         pass
                 
-                error_logger.error(f"Failed to parse JSON. Raw: {raw_text[:100]}...")
+                error_logger.error(f"Failed to parse JSON. Raw output start: {raw_text[:100]}...")
                 return None
 
     def _build_prompt(self, target_paper: dict, history: list) -> str:
-        
+        """
+        Constructs the prompt exactly as requested by the business logic.
+        """
         predict_context = f"predict paper name: {target_paper.get('PaperName', 'Unknown')} ({target_paper.get('PaperCode', 'Unknown')})"
         
         dep_lines = []
@@ -101,7 +106,7 @@ class LLMProvider(abc.ABC):
 class GeminiProvider(LLMProvider):
     def __init__(self):
         if not settings.GEMINI_API_KEY:
-            raise ValueError("GEMINI_API_KEY not set")
+            raise ValueError("GEMINI_API_KEY not set in configuration")
         self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
         self.model_name = settings.GEMINI_MODEL
 
@@ -118,25 +123,17 @@ class GeminiProvider(LLMProvider):
             
             result = self._clean_json_response(response.text)
             if not result:
-                raise ValueError("JSON parsing failed")
+                raise ValueError("Received invalid JSON format from Gemini")
             return result
 
         except Exception as e:
-            error_logger.error(f"Gemini Error for {target_paper.get('PaperCode')}: {e}")
-            return self._get_fallback_response(target_paper)
-
-    def _get_fallback_response(self, target_paper):
-        return {
-            "paper_name": target_paper.get('PaperName'),
-            "paper_code": target_paper.get('PaperCode'),
-            "risk_level": "Unknown",
-            "key_signals": [{"signal": "Error", "description": "Analysis Failed"}],
-            "risk_drivers": [],
-            "recommended_focus": []
-        }
+            error_logger.error(f"Gemini API Error for {target_paper.get('PaperCode')}: {str(e)}")
+            raise RuntimeError(f"Gemini Provider Failed: {str(e)}")
 
 class OpenAICompatibleProvider(LLMProvider):
     def __init__(self, api_key: str, base_url: str, model_name: str):
+        if not api_key:
+            raise ValueError(f"API Key missing for model {model_name}")
         self.client = AsyncOpenAI(api_key=api_key, base_url=base_url)
         self.model_name = model_name
 
@@ -151,17 +148,17 @@ class OpenAICompatibleProvider(LLMProvider):
                 ],
                 response_format={"type": "json_object"}
             )
-            return json.loads(response.choices[0].message.content)
+            
+            content = response.choices[0].message.content
+            result = self._clean_json_response(content)
+            
+            if not result:
+                raise ValueError("Received invalid JSON format from AI Provider")
+            return result
+
         except Exception as e:
-            error_logger.error(f"AI Provider Error: {e}")
-            return {
-                "paper_name": target_paper.get('PaperName'),
-                "paper_code": target_paper.get('PaperCode'),
-                "risk_level": "Unknown",
-                "key_signals": [],
-                "risk_drivers": [],
-                "recommended_focus": []
-            }
+            error_logger.error(f"AI Provider Error for {target_paper.get('PaperCode')}: {str(e)}")
+            raise RuntimeError(f"AI Provider Failed: {str(e)}")
 
 def get_llm_provider(provider_name: str = None) -> LLMProvider:
     provider_name = provider_name or "gemini"
@@ -170,17 +167,20 @@ def get_llm_provider(provider_name: str = None) -> LLMProvider:
 
     if provider_name == "gemini":
         return GeminiProvider()
+    
     elif provider_name == "openai":
         return OpenAICompatibleProvider(
             settings.OPENAI_API_KEY, 
-            "[https://api.openai.com/v1](https://api.openai.com/v1)", 
+            "https://api.openai.com/v1", 
             settings.OPENAI_MODEL
         )
+    
     elif provider_name == "deepseek":
         return OpenAICompatibleProvider(
             settings.DEEPSEEK_API_KEY, 
-            "[https://api.deepseek.com/v1](https://api.deepseek.com/v1)", 
+            "https://api.deepseek.com",
             settings.DEEPSEEK_MODEL
         )
+    
     else:
-        raise HTTPException(status_code=400, detail=f"Invalid provider: {provider_name}")   
+        raise HTTPException(status_code=400, detail=f"Invalid provider: {provider_name}")

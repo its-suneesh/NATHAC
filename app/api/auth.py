@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 import secrets
 from app.models.auth import LoginRequest
 from app.core.config import settings
-from app.core.security import create_access_token, verify_password, get_password_hash
+from app.core.security import create_access_token
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -11,6 +11,8 @@ def login(request: LoginRequest):
     """
     Authenticates a user securely.
     """
+    print(f"Server expects: '{settings.USERNAME}' / '{settings.PASSWORD}'")
+    print(f"Client sent:    '{request.username}' / '{request.password}'")
     is_username_correct = secrets.compare_digest(request.username, settings.USERNAME)
     is_password_correct = secrets.compare_digest(request.password, settings.PASSWORD)
 
