@@ -1,5 +1,6 @@
 import json
 import abc
+import re
 from google import genai
 from google.genai import types
 from openai import AsyncOpenAI
@@ -12,10 +13,29 @@ class LLMProvider(abc.ABC):
     async def analyze(self, target_paper: dict, history: list) -> dict:
         pass
 
+    def _clean_json_response(self, raw_text: str) -> dict:
+        """
+        Production Fix: Strips Markdown code blocks (e.g. ```json ... ```)
+        and attempts to locate the valid JSON object.
+        """
+        try:
+            return json.loads(raw_text)
+        except json.JSONDecodeError:
+            clean_text = re.sub(r"```json\s*|\s*```", "", raw_text).strip()
+            try:
+                return json.loads(clean_text)
+            except json.JSONDecodeError:
+                match = re.search(r"(\{.*\})", raw_text, re.DOTALL)
+                if match:
+                    try:
+                        return json.loads(match.group(1))
+                    except:
+                        pass
+                
+                error_logger.error(f"Failed to parse JSON. Raw: {raw_text[:100]}...")
+                return None
+
     def _build_prompt(self, target_paper: dict, history: list) -> str:
-        """
-        Constructs the prompt exactly as requested by the business logic.
-        """
         
         predict_context = f"predict paper name: {target_paper.get('PaperName', 'Unknown')} ({target_paper.get('PaperCode', 'Unknown')})"
         
@@ -25,7 +45,7 @@ class LLMProvider(abc.ABC):
             for dep in deps:
                 dep_lines.append(
                     f"dependency paper name: {dep.get('DependencyCourseName', 'Unknown')} | "
-                    f"Weightage: {dep.get('Weightage', 'N/A')} | "
+                    f"Weightage: {dep.get('Weightage', 'N/A')} out of 5 | "
                     f"Reason: {dep.get('Reason', 'N/A')}"
                 )
         else:
@@ -35,11 +55,10 @@ class LLMProvider(abc.ABC):
         
         history_lines = []
         for h in history:
-            
             int_mark = h.get('InternalMark', 0)
-            int_max = h.get('InternalMarkMax', 0)
+            int_max = h.get('InternalMaxMark', 0)
             ext_mark = h.get('ExternalMark', 0)
-            ext_max = h.get('ExternalMarkMax', 0)
+            ext_max = h.get('ExternalMaxMark', 0)
             
             int_display = f"{int_mark}/{int_max}" if int_max else "null"
             ext_display = f"{ext_mark}/{ext_max}" if ext_max else "null"
@@ -96,17 +115,25 @@ class GeminiProvider(LLMProvider):
                     response_mime_type="application/json"
                 )
             )
-            return json.loads(response.text)
+            
+            result = self._clean_json_response(response.text)
+            if not result:
+                raise ValueError("JSON parsing failed")
+            return result
+
         except Exception as e:
             error_logger.error(f"Gemini Error for {target_paper.get('PaperCode')}: {e}")
-            return {
-                "paper_name": target_paper.get('PaperName'),
-                "paper_code": target_paper.get('PaperCode'),
-                "risk_level": "Unknown",
-                "key_signals": [{"signal": "Error", "description": "AI Provider Failed"}],
-                "risk_drivers": [],
-                "recommended_focus": []
-            }
+            return self._get_fallback_response(target_paper)
+
+    def _get_fallback_response(self, target_paper):
+        return {
+            "paper_name": target_paper.get('PaperName'),
+            "paper_code": target_paper.get('PaperCode'),
+            "risk_level": "Unknown",
+            "key_signals": [{"signal": "Error", "description": "Analysis Failed"}],
+            "risk_drivers": [],
+            "recommended_focus": []
+        }
 
 class OpenAICompatibleProvider(LLMProvider):
     def __init__(self, api_key: str, base_url: str, model_name: str):
@@ -137,7 +164,7 @@ class OpenAICompatibleProvider(LLMProvider):
             }
 
 def get_llm_provider(provider_name: str = None) -> LLMProvider:
-    provider_name = (provider_name)
+    provider_name = provider_name or "gemini"
     
     app_logger.debug(f"Initializing Provider: {provider_name}")
 
@@ -146,14 +173,14 @@ def get_llm_provider(provider_name: str = None) -> LLMProvider:
     elif provider_name == "openai":
         return OpenAICompatibleProvider(
             settings.OPENAI_API_KEY, 
-            "https://api.openai.com/v1", 
+            "[https://api.openai.com/v1](https://api.openai.com/v1)", 
             settings.OPENAI_MODEL
         )
     elif provider_name == "deepseek":
         return OpenAICompatibleProvider(
             settings.DEEPSEEK_API_KEY, 
-            "https://api.deepseek.com/v1", 
+            "[https://api.deepseek.com/v1](https://api.deepseek.com/v1)", 
             settings.DEEPSEEK_MODEL
         )
     else:
-        raise HTTPException(status_code=400, detail=f"Invalid provider: {provider_name}")
+        raise HTTPException(status_code=400, detail=f"Invalid provider: {provider_name}")   

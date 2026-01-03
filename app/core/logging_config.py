@@ -1,20 +1,12 @@
 import logging
-import os
-from logging.handlers import RotatingFileHandler
+import sys
 
-os.makedirs("logs", exist_ok=True)
-
-
-def setup_logger(name: str, log_file: str, level=logging.INFO):
+def setup_logger(name: str, level=logging.INFO):
     formatter = logging.Formatter(
         "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
 
-    handler = RotatingFileHandler(
-        f"logs/{log_file}",
-        maxBytes=5 * 1024 * 1024,
-        backupCount=2
-    )
+    handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(formatter)
 
     logger = logging.getLogger(name)
@@ -25,6 +17,5 @@ def setup_logger(name: str, log_file: str, level=logging.INFO):
 
     return logger
 
-
-app_logger = setup_logger("app_logger", "app.log")
-error_logger = setup_logger("error_logger", "error.log")
+app_logger = setup_logger("app_logger")
+error_logger = setup_logger("error_logger")

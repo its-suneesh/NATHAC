@@ -1,19 +1,20 @@
 from fastapi import APIRouter, HTTPException
+import secrets
 from app.models.auth import LoginRequest
 from app.core.config import settings
-from app.core.security import create_access_token
+from app.core.security import create_access_token, verify_password, get_password_hash
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
-
 
 @router.post("/login")
 def login(request: LoginRequest):
     """
-    Authenticates a user and returns a JWT token.
-    Fixed security vulnerability where token was generated after failure.
+    Authenticates a user securely.
     """
-    
-    if request.username == settings.USERNAME and request.password == settings.PASSWORD:
+    is_username_correct = secrets.compare_digest(request.username, settings.USERNAME)
+    is_password_correct = secrets.compare_digest(request.password, settings.PASSWORD)
+
+    if is_username_correct and is_password_correct:
         access_token = create_access_token(
             data={"sub": request.username}
         )

@@ -1,81 +1,57 @@
 import asyncio
-from app.models.schemas import SubjectOutcome, AnalysisResponse
+from typing import List, Dict, Any
 from app.services.llm_service import get_llm_provider
-from app.core.logging_config import app_logger, error_logger
+from app.models.schemas import AnalyzeRequest, AnalysisResponse, SubjectOutcome
+from app.core.logging_config import app_logger
 
-async def process_student_risk(request_data, provider_name: str = None):
+async def process_student_risk(request_data: AnalyzeRequest, provider_name: str) -> AnalysisResponse:
     """
-    Orchestrates the parallel risk analysis.
-    1. Extracts student history (CoursesStudied).
-    2. Creates async tasks for each target subject (CoursesToStudy).
-    3. Aggregates results.
+    Orchestrates the risk analysis by processing all courses in parallel.
     """
     
-    student = request_data.student_data
+    llm_service = get_llm_provider(provider_name)
     
-    app_logger.info(
-        f"Starting parallel analysis | Student={student.StudentID} | "
-        f"SubjectCount={len(student.CoursesToStudyData)} | Provider={provider_name}"
-    )
-
-    try:
-        llm_service = get_llm_provider(provider_name)
-    except Exception as e:
-        error_logger.critical(f"Failed to initialize LLM service: {e}")
-        raise
-
-    history_dicts = [h.dict() for h in student.CoursesStudiedData]
+    history_data = [
+        course.model_dump() for course in request_data.student_data.CoursesStudiedData
+    ]
+    
+    courses_to_analyze = request_data.student_data.CoursesToStudyData
+    
+    app_logger.info(f"Starting parallel analysis for {len(courses_to_analyze)} courses.")
 
     tasks = []
-    for course_to_study in student.CoursesToStudyData:
-        task = llm_service.analyze(
-            target_paper=course_to_study.dict(),
-            history=history_dicts
-        )
-        tasks.append(task)
-
-    try:
-        raw_results = await asyncio.gather(*tasks, return_exceptions=True)
-    except Exception as e:
-        error_logger.critical(f"Critical failure during async gather: {e}")
-        raise
-
-    subject_outcomes = []
-    
-    for i, result in enumerate(raw_results):
-        original_course = student.CoursesToStudyData[i]
-
-        if isinstance(result, Exception):
-            error_logger.error(
-                f"Task failed for subject {original_course.PaperCode}: {result}"
+    for course in courses_to_analyze:
+        tasks.append(
+            llm_service.analyze(
+                target_paper=course.model_dump(),
+                history=history_data
             )
-            subject_outcomes.append(SubjectOutcome(
-                paper_name=original_course.PaperName,
-                paper_code=original_course.PaperCode,
-                risk_level="Unknown",
-                key_signals=[],
-                risk_drivers=["Internal Analysis Error"],
-                recommended_focus=["Contact administrator"]
-            ))
-        else:
-            try:
-                outcome = SubjectOutcome(**result)
-                subject_outcomes.append(outcome)
-            except Exception as validation_err:
-                error_logger.error(f"Schema validation failed for AI response: {validation_err}")
-                subject_outcomes.append(SubjectOutcome(
-                    paper_name=original_course.PaperName,
-                    paper_code=original_course.PaperCode,
+        )
+
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    subject_outcomes: List[SubjectOutcome] = []
+    
+    for i, result in enumerate(results):
+        course_meta = courses_to_analyze[i]
+        
+        if isinstance(result, Exception):
+            app_logger.error(f"Analysis failed for {course_meta.PaperCode}: {str(result)}")
+            subject_outcomes.append(
+                SubjectOutcome(
+                    paper_name=course_meta.PaperName,
+                    paper_code=course_meta.PaperCode,
                     risk_level="Unknown",
                     key_signals=[],
-                    risk_drivers=["Data Format Error"],
+                    risk_drivers=["System Error during analysis"],
                     recommended_focus=[]
-                ))
-
-    app_logger.info(f"Analysis completed successfully | Student={student.StudentID}")
+                )
+            )
+        else:
+            subject_outcomes.append(SubjectOutcome(**result))
 
     return AnalysisResponse(
-        student_id=student.StudentID,
-        studentsemesteryerrid=student.StudentSemesterYearID,
+        student_id=request_data.student_data.StudentID,
+        studentsemesteryerrid=request_data.student_data.SemesterYearStudentID,
         subject_outcomes=subject_outcomes
     )

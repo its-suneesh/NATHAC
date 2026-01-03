@@ -6,4 +6,5 @@ pydantic-settings
 python-jose[cryptography]
 google-genai
 openai
+passlib[bcrypt]
 httpx

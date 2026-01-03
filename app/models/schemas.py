@@ -21,9 +21,9 @@ class CourseStudied(BaseModel):
     PaperName: str
     PaperCode: str
     InternalMark: float
-    InternalMarkMax: Optional[float] = 0.0
+    InternalMaxMark: Optional[float] = 0.0
     ExternalMark: float
-    ExternalMarkMax: Optional[float] = 0.0
+    ExternalMaxMark: Optional[float] = 0.0
     SemesterName: Optional[str] = None
     MarkOrGrade: Optional[Any] = None 
     model_config = {"extra": "ignore"}
@@ -31,10 +31,10 @@ class CourseStudied(BaseModel):
 class StudentRequestData(BaseModel):
     StudentName: str
     StudentID: str
-    StudentSemesterYearID: str
-    AdmissionNo: str
-    RegisterNo: str
-    CourseName: str
+    SemesterYearStudentID: str
+    AdmissionNo: Optional[str]
+    RegisterNo: Optional[str]
+    CourseName: Optional[str]
     CoursesToStudyData: List[CourseToStudy]
     CoursesStudiedData: List[CourseStudied]
 
@@ -54,6 +54,7 @@ class SubjectOutcome(BaseModel):
     key_signals: List[KeySignal]
     risk_drivers: List[str]
     recommended_focus: List[str]
+    
 
 class AnalysisResponse(BaseModel):
     student_id: str
