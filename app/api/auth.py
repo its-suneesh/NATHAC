@@ -11,8 +11,7 @@ def login(request: LoginRequest):
     """
     Authenticates a user securely.
     """
-    print(f"Server expects: '{settings.USERNAME}' / '{settings.PASSWORD}'")
-    print(f"Client sent:    '{request.username}' / '{request.password}'")
+    
     is_username_correct = secrets.compare_digest(request.username, settings.USERNAME)
     is_password_correct = secrets.compare_digest(request.password, settings.PASSWORD)
 

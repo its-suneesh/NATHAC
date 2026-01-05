@@ -4,10 +4,12 @@ from app.services.llm_service import get_llm_provider
 from app.models.schemas import StudentRequestData, AnalysisResponse, SubjectOutcome
 from app.core.logging_config import app_logger
 
+
+MAX_CONCURRENT_LLM_CALLS = 6
+
 async def process_student_risk(student_data: StudentRequestData, provider_name: str) -> AnalysisResponse:
     """
-    Orchestrates risk analysis. 
-    Now accepts valid StudentRequestData directly.
+    Orchestrates risk analysis with concurrency control (Semaphore).
     """
     
     llm_service = get_llm_provider(provider_name)
@@ -20,14 +22,16 @@ async def process_student_risk(student_data: StudentRequestData, provider_name: 
     
     app_logger.info(f"Starting analysis for {len(courses_to_analyze)} courses.")
 
-    tasks = []
-    for course in courses_to_analyze:
-        tasks.append(
-            llm_service.analyze(
+    sem = asyncio.Semaphore(MAX_CONCURRENT_LLM_CALLS)
+
+    async def analyze_with_limit(course):
+        async with sem:
+            return await llm_service.analyze(
                 target_paper=course.model_dump(),
                 history=history_data
             )
-        )
+
+    tasks = [analyze_with_limit(course) for course in courses_to_analyze]
 
     try:
         results = await asyncio.gather(*tasks)

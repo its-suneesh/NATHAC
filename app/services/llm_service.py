@@ -1,6 +1,7 @@
 import json
 import abc
 import re
+from functools import lru_cache
 from google import genai
 from google.genai import types
 from openai import AsyncOpenAI
@@ -14,20 +15,13 @@ class LLMProvider(abc.ABC):
         pass
 
     def _clean_json_response(self, raw_text: str) -> dict:
-        """
-        Production Utility: Strips Markdown code blocks (e.g. ```json ... ```)
-        and attempts to locate the valid JSON object.
-        """
         try:
-            # 1. Try direct parsing first
             return json.loads(raw_text)
         except json.JSONDecodeError:
-            # 2. Try stripping markdown
             clean_text = re.sub(r"```json\s*|\s*```", "", raw_text).strip()
             try:
                 return json.loads(clean_text)
             except json.JSONDecodeError:
-                # 3. Fallback: Find the first curly brace pair
                 match = re.search(r"(\{.*\})", raw_text, re.DOTALL)
                 if match:
                     try:
@@ -39,9 +33,6 @@ class LLMProvider(abc.ABC):
                 return None
 
     def _build_prompt(self, target_paper: dict, history: list) -> str:
-        """
-        Constructs the prompt exactly as requested by the business logic.
-        """
         predict_context = f"predict paper name: {target_paper.get('PaperName', 'Unknown')} ({target_paper.get('PaperCode', 'Unknown')})"
         
         dep_lines = []
@@ -120,7 +111,6 @@ class GeminiProvider(LLMProvider):
                     response_mime_type="application/json"
                 )
             )
-            
             result = self._clean_json_response(response.text)
             if not result:
                 raise ValueError("Received invalid JSON format from Gemini")
@@ -159,28 +149,34 @@ class OpenAICompatibleProvider(LLMProvider):
         except Exception as e:
             error_logger.error(f"AI Provider Error for {target_paper.get('PaperCode')}: {str(e)}")
             raise RuntimeError(f"AI Provider Failed: {str(e)}")
+        
+_provider_cache = {}
 
-def get_llm_provider(provider_name: str = None) -> LLMProvider:
-    provider_name = provider_name or "gemini"
+def get_llm_provider(provider_name: str = "gemini") -> LLMProvider:
+    """
+    Returns a cached instance of the LLM provider.
+    """
+    if provider_name in _provider_cache:
+        return _provider_cache[provider_name]
     
-    app_logger.debug(f"Initializing Provider: {provider_name}")
+    app_logger.info(f"Initializing new LLM Provider Instance: {provider_name}")
 
     if provider_name == "gemini":
-        return GeminiProvider()
-    
+        instance = GeminiProvider()
     elif provider_name == "openai":
-        return OpenAICompatibleProvider(
+        instance = OpenAICompatibleProvider(
             settings.OPENAI_API_KEY, 
             "https://api.openai.com/v1", 
             settings.OPENAI_MODEL
         )
-    
     elif provider_name == "deepseek":
-        return OpenAICompatibleProvider(
+        instance = OpenAICompatibleProvider(
             settings.DEEPSEEK_API_KEY, 
             "https://api.deepseek.com",
             settings.DEEPSEEK_MODEL
         )
-    
     else:
         raise HTTPException(status_code=400, detail=f"Invalid provider: {provider_name}")
+    
+    _provider_cache[provider_name] = instance
+    return instance

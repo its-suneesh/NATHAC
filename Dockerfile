@@ -19,12 +19,11 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser
 
 COPY --from=builder /app/wheels /wheels
 COPY --from=builder /app/requirements.txt .
-
 RUN pip install --no-cache /wheels/*
 
 COPY . .
 
-RUN chown -R appuser:appuser /app
+RUN mkdir -p /app/logs && chown -R appuser:appuser /app
 
 USER appuser
 

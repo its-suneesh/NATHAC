@@ -1,6 +1,5 @@
-from typing import List, Optional, Literal, Any
+from typing import List, Optional, Literal, Union
 from pydantic import BaseModel, HttpUrl
-
 
 class DependencyData(BaseModel):
     DependencyCourseName: str = "Unknown"
@@ -36,18 +35,17 @@ class CourseStudied(BaseModel):
 
 class StudentRequestData(BaseModel):
     StudentName: str
-    StudentID: Any
+    StudentID: Union[str, int]
     Batch: Optional[str] = None
     Gender: Optional[str] = None
     Email: Optional[str] = None
-    SemesterYearStudentID: Any
+    SemesterYearStudentID: Union[str, int]
     AdmissionNo: Optional[str] = None
     RegisterNo: Optional[str] = None
     CourseName: Optional[str] = None
     CoursesToStudyData: List[CourseToStudy]
     CoursesStudiedData: List[CourseStudied]
     model_config = {"extra": "ignore"}
-
 
 class AnalyzeRequest(BaseModel):
     url: HttpUrl
