@@ -13,14 +13,14 @@ class CourseToStudy(BaseModel):
     PaperCode: str
     CourseOutComes: Optional[str] = None
     PaperNameID: int
-    SemesterYearStudentID: int
+    SemesterYearStudentID: Union[str,int]
     DependencyCourseData: List[DependencyData] = []
     model_config = {"extra": "ignore"}
 
 class CourseStudied(BaseModel):
     PaperName: str
     PaperCode: str
-    SemesterYearStudentID: str
+    SemesterYearStudentID: Union[str,int]
     CourseOutComes: Optional[str] = None
     PaperNameID: int
     InternalMark: float = 0.0
@@ -35,11 +35,11 @@ class CourseStudied(BaseModel):
 
 class StudentRequestData(BaseModel):
     StudentName: str
-    StudentID: Union[str, int]
+    StudentID: Union[str,int]   
     Batch: Optional[str] = None
     Gender: Optional[str] = None
     Email: Optional[str] = None
-    SemesterYearStudentID: Union[str, int]
+    SemesterYearStudentID: Union[str,int]
     AdmissionNo: Optional[str] = None
     RegisterNo: Optional[str] = None
     CourseName: Optional[str] = None
