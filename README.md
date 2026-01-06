@@ -1,195 +1,194 @@
+```markdown
+# NATHAC API - Academic Risk Analyzer
 
+A high-performance FastAPI application designed to analyze student academic performance and predict failure risks using Large Language Models (LLMs). It integrates with **Google Gemini**, **OpenAI**, and **DeepSeek** to generate detailed insights based on student history and course dependencies.
 
-# 🧠 NATHAC – Academic Risk Analysis System
+## 🚀 Key Features
 
-NATHAC is an **AI-powered academic risk analysis system** built using **FastAPI** and **Google Gemini AI**.
-It analyzes a student’s **prerequisite subject performance** to predict the **risk level** for future subjects and provides **actionable academic recommendations**.
-
----
-
-## ✨ Key Features
-
-* 🚀 **FastAPI-based REST API**
-* 🤖 **Gemini AI integration** (`gemini-2.5-flash`)
-* 🔐 **JWT Authentication** (login → access token)
-* 🧵 **Async, non-blocking AI calls** (no hanging requests)
-* 🧪 **Structured request & response schemas**
-* 📊 **Prerequisite-based academic risk analysis**
-* 📝 **Centralized logging with rotating log files**
-* 🧱 **Clean, scalable project structure**
+* **Multi-LLM Support:** Seamlessly switch between Gemini 1.5, GPT-4, and DeepSeek.
+* **Production Optimized:** Implements connection pooling (`httpx`), concurrency limits (`asyncio.Semaphore`), and caching.
+* **Secure:** JWT Authentication and environment-based configuration.
+* **Docker Ready:** Fully containerized with non-root user security and Gunicorn workers.
 
 ---
 
-## 🗂️ Project Structure
+## 🛠️ Setup & Installation
+
+### 1. Prerequisites
+* Docker & Docker Compose
+* Python 3.11+ (for local development)
+
+### 2. Environment Configuration
+Create a `.env` file in the root directory:
+
+```ini
+# Security
+JWT_SECRET_KEY=your_super_secret_jwt_key
+USERNAME=admin
+PASSWORD=your_secure_password
+ACCESS_TOKEN_EXPIRE_HOURS=24
+
+# LLM Keys (Add at least one)
+GEMINI_API_KEY=your_gemini_key
+GEMINI_MODEL=gemini-1.5-flash
+
+OPENAI_API_KEY=your_openai_key
+OPENAI_MODEL=gpt-4-turbo
+
+DEEPSEEK_API_KEY=your_deepseek_key
+DEEPSEEK_MODEL=deepseek-chat
 
 ```
-nathac/
-│
-├── app/
-│   ├── api/
-│   │   ├── analyze.py        # Protected analysis endpoint
-│   │   └── auth.py           # Login & token generation
-│   │
-│   ├── core/
-│   │   ├── config.py         # Environment configuration
-│   │   ├── security.py       # JWT create & verify
-│   │   ├── dependencies.py  # Auth dependency
-│   │   └── logging_config.py# Logging setup
-│   │
-│   ├── models/
-│   │   └── schemas.py        # Pydantic models
-│   │
-│   ├── services/
-│   │   ├── processor.py     # Core analysis workflow
-│   │   └── llm_service.py   # Async Gemini AI calls
-│   │
-│   └── main.py               # FastAPI app entry point
-│
-├── logs/
-│   ├── app.log               # Application logs
-│   └── error.log             # Error logs
-│
-├── .env                      # Environment variables (not committed)
-├── .gitignore
-├── requirements.txt
-└── README.md
+
+### 3. Running with Docker (Recommended)
+
+```bash
+docker-compose up --build
+
+```
+
+The API will be available at: `http://localhost:8000`
+
+### 4. Running Locally
+
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Run server
+uvicorn app.main:app --reload
+
 ```
 
 ---
 
-## 🔐 Authentication Flow (JWT)
+## 📚 API Endpoints
 
-1. **Login** using username & password
-2. Receive **JWT access token**
-3. Use token to access protected endpoints
+### 1. Authentication
 
-### Login Endpoint
+**Endpoint:** `POST /auth/login`
 
-```
-POST /auth/login
-```
+Generates a Bearer token required for accessing protected endpoints.
 
-**Request**
+**Request Body:**
 
 ```json
 {
   "username": "admin",
-  "password": "admin123"
+  "password": "your_secure_password"
 }
+
 ```
 
-**Response**
+**Response:**
 
 ```json
 {
-  "access_token": "eyJhbGciOiJIUzI1NiIs...",
+  "access_token": "eyJhbGciOiJIUzI1NiIsIn...",
   "token_type": "bearer"
 }
+
 ```
 
 ---
 
-## 🧠 Academic Risk Analysis Endpoint
+### 2. Analyze Student Risk
 
-### Protected Endpoint
+**Endpoint:** `POST /api/v1/analyze`
 
-```
-POST /api/v1/analyze
-```
+**Headers:**
 
-### Headers
+* `Authorization`: `Bearer <your_access_token>`
 
-```
-Authorization: Bearer <access_token>
-```
-
-### Request Body (Example)
+**Request Body:**
 
 ```json
 {
-  "student": {
-    "student_id": "S001",
-    "academic_history": [
-      {
-        "subject_code": "CS101",
-        "semester": 1,
-        "internal": [
-          { "name": "Midterm", "score": 18, "max": 25 }
-        ],
-        "external": { "score": 42, "max": 60 },
-        "final_grade": "B"
-      }
-    ]
-  },
-  "dependencies": {
-    "subjects_to_predict": [
-      {
-        "subject_code": "CS301",
-        "dependencies": [
-          {
-            "subject_code": "CS101",
-            "weight": 0.4,
-            "reason": "Programming fundamentals"
-          }
-        ]
-      }
-    ]
-  }
+  "url": "[https://external-system.com/api/student/123](https://external-system.com/api/student/123)",
+  "model_provider": "gemini" 
 }
+
 ```
 
-### Response (Example)
+* `url`: A public URL returning the student JSON data (format below).
+* `model_provider`: Options: `"gemini"`, `"openai"`, `"deepseek"`. (Default: `"gemini"`)
+
+**Response:**
 
 ```json
 {
-  "analysis_id": "e7f1d5c4-8c1f-4e2b-a9b1-9d9b7f13aabc",
-  "student_id": "S001",
-  "subjects_requested": ["CS301"],
+  "student_id": "101",
+  "studentsemesteryerrid": "2024-S1",
   "subject_outcomes": [
     {
-      "subject_code": "CS301",
-      "risk_level": "Medium",
+      "paper_name": "Data Structures",
+      "paper_code": "CS201",
+      "risk_level": "High",
       "key_signals": [
         {
-          "signal": "Weak loop concepts",
-          "description": "Moderate performance in CS101"
+          "signal": "Prerequisite Failure",
+          "description": "Failed C Programming which has 5/5 weightage."
         }
       ],
-      "risk_drivers": ["Low internal score in CS101"],
-      "recommended_focus": ["Practice basic programming problems"]
+      "risk_drivers": [
+        "Low internal marks (12/50)",
+        "History of struggling with logic-based subjects"
+      ],
+      "recommended_focus": [
+        "Retake C Programming concepts",
+        "Focus on pointer arithmetic exercises"
+      ]
     }
   ]
 }
+
 ```
 
 ---
 
-## ⚙️ Environment Configuration
+## 📄 External Data Format (The URL)
 
-Create a `.env` file in the root directory:
+The `url` you provide in the analyze request **must** return a JSON object (or list containing one object) with this structure:
 
-```env
-GEMINI_API_KEY=your_gemini_api_key_here
-JWT_SECRET_KEY=your_strong_random_secret_here
+```json
+{
+  "StudentName": "John Doe",
+  "StudentID": "101",
+  "SemesterYearStudentID": "2024-S1",
+  
+  "CoursesToStudyData": [
+    {
+      "PaperName": "Advanced Python",
+      "PaperCode": "CS305",
+      "PaperNameID": 501,
+      "SemesterYearStudentID": 2024,
+      "DependencyCourseData": [
+        {
+          "DependencyCourseName": "Basic Python",
+          "DependencyCourseCode": "CS101",
+          "Weightage": "5",
+          "Reason": "Core syntax required"
+        }
+      ]
+    }
+  ],
+  
+  "CoursesStudiedData": [
+    {
+      "PaperName": "Basic Python",
+      "PaperCode": "CS101",
+      "PaperNameID": 101,
+      "SemesterYearStudentID": "2023-S1",
+      "InternalMark": 45.0,
+      "InternalMaxMark": 50.0,
+      "ExternalMark": 30.0,
+      "ExternalMaxMark": 100.0,
+      "GradeObtained": "B",
+      "MarkOrGrade": "Grade"
+    }
+  ]
+}
+
 ```
 
-> ⚠️ Never commit `.env` to GitHub.
-
-## 📦 Requirements
-
-Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-## ▶️ Running the Application
-
-```bash
-uvicorn app.main:app --reload
-```
-
-Open Swagger UI:
-
-```
-http://127.0.0.1:8000/
 ```
