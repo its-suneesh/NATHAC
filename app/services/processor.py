@@ -39,10 +39,16 @@ async def process_student_risk(student_data: StudentRequestData, provider_name: 
     except Exception as e:
         raise RuntimeError(f"Failed during batch processing: {str(e)}") from e
 
-    subject_outcomes = [SubjectOutcome(**res) for res in results]
+    subject_outcomes = []
+    
+    for course, res in zip(courses_to_analyze, results):
+        
+        res['PaperNameID'] = course.PaperNameID 
+        
+        subject_outcomes.append(SubjectOutcome(**res))
 
     return AnalysisResponse(
-        student_id=str(student_data.StudentID),
-        studentsemesteryerrid=str(student_data.SemesterYearStudentID),
+        StudentID=str(student_data.StudentID),
+        SemesterYearStudentID=str(student_data.SemesterYearStudentID),
         subject_outcomes=subject_outcomes
     )

@@ -117,8 +117,8 @@ Generates a Bearer token required for accessing protected endpoints.
 
 ```json
 {
-  "student_id": "101",
-  "studentsemesteryerrid": "2024-S1",
+  "StudentID": "101",
+  "SemesterYearStudentID": "2024-S1",
   "subject_outcomes": [
     {
       "paper_name": "Data Structures",

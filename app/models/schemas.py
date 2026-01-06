@@ -58,12 +58,13 @@ class KeySignal(BaseModel):
 class SubjectOutcome(BaseModel):
     paper_name: str
     paper_code: str
+    PaperNameID: int
     risk_level: str
     key_signals: List[KeySignal]
     risk_drivers: List[str]
     recommended_focus: List[str]
 
 class AnalysisResponse(BaseModel):
-    student_id: str
-    studentsemesteryerrid: str
+    StudentID: str
+    SemesterYearStudentID: str
     subject_outcomes: List[SubjectOutcome]
