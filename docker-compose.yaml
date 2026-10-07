@@ -4,8 +4,9 @@ services:
   api:
     build: .
     container_name: nathac-api
+    # Published and listened on from the same .env value.
     ports:
-      - "8000:8000"
+      - "${PORT:-5014}:${PORT:-5014}"
     volumes:
       - ./logs:/app/logs 
     env_file:

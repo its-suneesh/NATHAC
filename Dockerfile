@@ -27,6 +27,9 @@ RUN mkdir -p /app/logs && chown -R appuser:appuser /app
 
 USER appuser
 
-EXPOSE 8000
+# The port comes from .env. Shell form on purpose: the exec form would hand
+# gunicorn the literal text ${PORT} instead of the number.
+ENV PORT=5014
+EXPOSE ${PORT}
 
-CMD ["gunicorn", "app.main:app", "--workers", "4", "--worker-class", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000"]
+CMD gunicorn app.main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:${PORT:-5014}
